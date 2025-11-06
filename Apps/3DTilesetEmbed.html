@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cesium 3D Tileset Viewer with Tools</title>
+
+  <!-- Cesium -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Toolbar */
+    #toolbar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(42, 42, 42, 0.95);
+      padding: 10px;
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-width: 250px;
+    }
+
+    #toolbar button {
+      background: #4a4a4a;
+      color: white;
+      border: 1px solid #5a5a5a;
+      padding: 8px 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+
+    #toolbar button:hover {
+      background: #5a5a5a;
+    }
+
+    #toolbar button.active {
+      background: #4a90e2;
+      border-color: #357abd;
+    }
+
+    #toolbar .section-title {
+      color: #aaa;
+      font-size: 11px;
+      text-transform: uppercase;
+      margin-top: 10px;
+      margin-bottom: 3px;
+      font-family: sans-serif;
+    }
+
+    #toolbar .section-title:first-child {
+      margin-top: 0;
+    }
+
+    /* Layer Controls */
+    .layer-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px;
+      background: #3a3a3a;
+      border-radius: 3px;
+      margin-bottom: 3px;
+    }
+
+    .layer-control input[type="checkbox"] {
+      cursor: pointer;
+    }
+
+    .layer-control label {
+      color: white;
+      font-size: 12px;
+      font-family: sans-serif;
+      cursor: pointer;
+      flex: 1;
+    }
+
+    .layer-control input[type="range"] {
+      flex: 1;
+      cursor: pointer;
+    }
+
+    /* Info Panel */
+    #infoPanel {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(42, 42, 42, 0.95);
+      padding: 10px;
+      border-radius: 5px;
+      color: white;
+      font-family: monospace;
+      font-size: 12px;
+      max-width: 300px;
+      display: none;
+    }
+
+    #infoPanel.visible {
+      display: block;
+    }
+
+    /* Measurement Info */
+    #measurementInfo {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: rgba(42, 42, 42, 0.95);
+      padding: 10px;
+      border-radius: 5px;
+      color: white;
+      font-family: sans-serif;
+      font-size: 13px;
+      max-width: 250px;
+      display: none;
+    }
+
+    #measurementInfo.visible {
+      display: block;
+    }
+
+    #measurementInfo .title {
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #4a90e2;
+    }
+
+    #measurementInfo .clear-btn {
+      background: #d9534f;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      margin-top: 8px;
+      width: 100%;
+    }
+
+    #measurementInfo .clear-btn:hover {
+      background: #c9302c;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <div class="section-title">Measurement Tools</div>
+    <button id="measureDistance">📏 Measure Distance</button>
+    <button id="measureArea">📐 Measure Area</button>
+    <button id="clearMeasurements">🗑️ Clear Measurements</button>
+
+    <div class="section-title">View Controls</div>
+    <button id="inspectFeatures">🔍 Inspect Features</button>
+    <button id="toggleInspector">🔧 3D Tiles Inspector</button>
+
+    <div class="section-title">Layers</div>
+    <div class="layer-control">
+      <input type="checkbox" id="tilesetVisible" checked>
+      <label for="tilesetVisible">3D Tileset</label>
+    </div>
+    <div class="layer-control">
+      <label for="tilesetOpacity">Opacity:</label>
+      <input type="range" id="tilesetOpacity" min="0" max="100" value="100">
+    </div>
+    <div class="layer-control">
+      <input type="checkbox" id="terrainVisible" checked>
+      <label for="terrainVisible">Terrain</label>
+    </div>
+    <div class="layer-control">
+      <input type="checkbox" id="imageryVisible" checked>
+      <label for="imageryVisible">Imagery</label>
+    </div>
+  </div>
+
+  <!-- Info Panel -->
+  <div id="infoPanel"></div>
+
+  <!-- Measurement Info -->
+  <div id="measurementInfo">
+    <div class="title">Measurement</div>
+    <div id="measurementResult"></div>
+    <button class="clear-btn" onclick="clearCurrentMeasurement()">Clear</button>
+  </div>
+
+  <script>
+    // Configure Cesium Ion access token
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2NDQwZmY1Ny05OWFlLTQ4ZTgtYWFjNS0yZWY4YzYyZTM1ZmIiLCJpZCI6MzU3ODExLCJpYXQiOjE3NjI0MjkxNjB9.OxogfbQax9huxXihwGkJ9GemU8rj2M4WhUweWguwS-Y';
+
+    // Initialize Cesium Viewer
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      terrainProvider: await Cesium.CesiumTerrainProvider.fromIonAssetId(1),
+      timeline: true,
+      animation: true,
+      baseLayerPicker: true,
+      geocoder: true,
+      homeButton: true,
+      sceneModePicker: true,
+      navigationHelpButton: true,
+      fullscreenButton: true,
+      infoBox: true,
+      selectionIndicator: true
+    });
+
+    // Load 3D Tileset from Cesium Ion
+    let tileset = null;
+    try {
+      tileset = await viewer.scene.primitives.add(
+        await Cesium.Cesium3DTileset.fromIonAssetId(4019912)
+      );
+
+      // Fly to the tileset
+      viewer.flyTo(tileset, {
+        duration: 2.0
+      });
+
+      console.log('3D Tileset loaded successfully');
+    } catch (error) {
+      console.error('Error loading 3D Tileset:', error);
+      alert('Failed to load 3D Tileset. Check console for details.');
+    }
+
+    // ===== MEASUREMENT TOOLS =====
+
+    let measurementMode = null; // 'distance', 'area', or null
+    let measurementPoints = [];
+    let measurementEntities = [];
+    let measurementHandler = null;
+
+    // Distance measurement
+    function startDistanceMeasurement() {
+      clearMeasurementMode();
+      measurementMode = 'distance';
+      measurementPoints = [];
+      document.getElementById('measureDistance').classList.add('active');
+      document.getElementById('measurementInfo').classList.add('visible');
+      document.getElementById('measurementResult').innerHTML = 'Click on the map to place points';
+
+      if (!measurementHandler) {
+        measurementHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      }
+
+      measurementHandler.setInputAction(function(click) {
+        const ray = viewer.camera.getPickRay(click.position);
+        const position = viewer.scene.globe.pick(ray, viewer.scene);
+
+        if (position) {
+          measurementPoints.push(position);
+
+          // Add point marker
+          const entity = viewer.entities.add({
+            position: position,
+            point: {
+              pixelSize: 8,
+              color: Cesium.Color.YELLOW,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 2
+            }
+          });
+          measurementEntities.push(entity);
+
+          // If we have 2 or more points, draw line and calculate distance
+          if (measurementPoints.length >= 2) {
+            const lastIndex = measurementPoints.length - 1;
+            const lineEntity = viewer.entities.add({
+              polyline: {
+                positions: [measurementPoints[lastIndex - 1], measurementPoints[lastIndex]],
+                width: 3,
+                material: Cesium.Color.YELLOW,
+                clampToGround: true
+              }
+            });
+            measurementEntities.push(lineEntity);
+
+            // Calculate total distance
+            let totalDistance = 0;
+            for (let i = 1; i < measurementPoints.length; i++) {
+              const cart1 = Cesium.Cartographic.fromCartesian(measurementPoints[i - 1]);
+              const cart2 = Cesium.Cartographic.fromCartesian(measurementPoints[i]);
+              const geodesic = new Cesium.EllipsoidGeodesic(cart1, cart2);
+              totalDistance += geodesic.surfaceDistance;
+            }
+
+            const distanceKm = (totalDistance / 1000).toFixed(2);
+            const distanceM = totalDistance.toFixed(2);
+            document.getElementById('measurementResult').innerHTML =
+              `<strong>Distance:</strong><br>` +
+              `${distanceM} m<br>` +
+              `${distanceKm} km<br>` +
+              `<small>Points: ${measurementPoints.length}</small>`;
+          }
+        }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }
+
+    // Area measurement
+    function startAreaMeasurement() {
+      clearMeasurementMode();
+      measurementMode = 'area';
+      measurementPoints = [];
+      document.getElementById('measureArea').classList.add('active');
+      document.getElementById('measurementInfo').classList.add('visible');
+      document.getElementById('measurementResult').innerHTML = 'Click on the map to place points. Right-click to finish.';
+
+      if (!measurementHandler) {
+        measurementHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      }
+
+      measurementHandler.setInputAction(function(click) {
+        const ray = viewer.camera.getPickRay(click.position);
+        const position = viewer.scene.globe.pick(ray, viewer.scene);
+
+        if (position) {
+          measurementPoints.push(position);
+
+          // Add point marker
+          const entity = viewer.entities.add({
+            position: position,
+            point: {
+              pixelSize: 8,
+              color: Cesium.Color.CYAN,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 2
+            }
+          });
+          measurementEntities.push(entity);
+
+          // If we have 2 or more points, draw polygon outline
+          if (measurementPoints.length >= 2) {
+            // Remove previous polygon if exists
+            if (measurementEntities.length > measurementPoints.length) {
+              viewer.entities.remove(measurementEntities[measurementEntities.length - 1]);
+              measurementEntities.pop();
+            }
+
+            const polygonEntity = viewer.entities.add({
+              polygon: {
+                hierarchy: new Cesium.PolygonHierarchy(measurementPoints),
+                material: Cesium.Color.CYAN.withAlpha(0.3),
+                outline: true,
+                outlineColor: Cesium.Color.CYAN,
+                outlineWidth: 3
+              }
+            });
+            measurementEntities.push(polygonEntity);
+
+            // Calculate area (approximate for now)
+            if (measurementPoints.length >= 3) {
+              const area = calculatePolygonArea(measurementPoints);
+              const areaKm2 = (area / 1000000).toFixed(3);
+              const areaM2 = area.toFixed(2);
+              document.getElementById('measurementResult').innerHTML =
+                `<strong>Area:</strong><br>` +
+                `${areaM2} m²<br>` +
+                `${areaKm2} km²<br>` +
+                `<small>Points: ${measurementPoints.length}</small>`;
+            }
+          }
+        }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+      // Right-click to finish
+      measurementHandler.setInputAction(function() {
+        if (measurementPoints.length >= 3) {
+          clearMeasurementMode();
+          document.getElementById('measurementInfo').classList.add('visible');
+        }
+      }, Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+    }
+
+    // Calculate polygon area (simplified - uses planar approximation)
+    function calculatePolygonArea(positions) {
+      if (positions.length < 3) return 0;
+
+      let area = 0;
+      const cartographicPositions = positions.map(p => Cesium.Cartographic.fromCartesian(p));
+
+      for (let i = 0; i < cartographicPositions.length; i++) {
+        const j = (i + 1) % cartographicPositions.length;
+        const xi = cartographicPositions[i].longitude;
+        const yi = cartographicPositions[i].latitude;
+        const xj = cartographicPositions[j].longitude;
+        const yj = cartographicPositions[j].latitude;
+        area += xi * yj - xj * yi;
+      }
+
+      area = Math.abs(area) / 2;
+
+      // Convert from radians squared to meters squared (approximate)
+      const earthRadiusMeters = 6371000;
+      const avgLat = cartographicPositions.reduce((sum, p) => sum + p.latitude, 0) / cartographicPositions.length;
+      const metersPerDegree = earthRadiusMeters * Math.cos(avgLat);
+      area = area * metersPerDegree * metersPerDegree;
+
+      return area;
+    }
+
+    // Clear measurement mode
+    function clearMeasurementMode() {
+      measurementMode = null;
+      measurementPoints = [];
+      document.getElementById('measureDistance').classList.remove('active');
+      document.getElementById('measureArea').classList.remove('active');
+
+      if (measurementHandler) {
+        measurementHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        measurementHandler.removeInputAction(Cesium.ScreenSpaceEventType.RIGHT_CLICK);
+      }
+    }
+
+    // Clear all measurements
+    function clearAllMeasurements() {
+      clearMeasurementMode();
+      measurementEntities.forEach(entity => viewer.entities.remove(entity));
+      measurementEntities = [];
+      document.getElementById('measurementInfo').classList.remove('visible');
+    }
+
+    // Clear current measurement
+    function clearCurrentMeasurement() {
+      clearAllMeasurements();
+    }
+
+    // ===== FEATURE INSPECTION =====
+
+    let inspectionMode = false;
+    let inspectionHandler = null;
+
+    function toggleFeatureInspection() {
+      inspectionMode = !inspectionMode;
+      const button = document.getElementById('inspectFeatures');
+
+      if (inspectionMode) {
+        button.classList.add('active');
+        document.getElementById('infoPanel').classList.add('visible');
+
+        if (!inspectionHandler) {
+          inspectionHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+        }
+
+        inspectionHandler.setInputAction(function(movement) {
+          const pickedFeature = viewer.scene.pick(movement.position);
+          const infoPanel = document.getElementById('infoPanel');
+
+          if (Cesium.defined(pickedFeature)) {
+            let infoHtml = '<strong>Feature Information:</strong><br><br>';
+
+            // Check if it's a 3D Tiles feature
+            if (pickedFeature instanceof Cesium.Cesium3DTileFeature) {
+              const propertyIds = pickedFeature.getPropertyIds();
+              if (propertyIds.length > 0) {
+                propertyIds.forEach(propertyId => {
+                  const value = pickedFeature.getProperty(propertyId);
+                  infoHtml += `<strong>${propertyId}:</strong> ${value}<br>`;
+                });
+              } else {
+                infoHtml += 'No properties available<br>';
+              }
+
+              infoHtml += `<br><strong>Tile:</strong> ${pickedFeature.tileset.url}<br>`;
+            }
+            // Check if it's an entity
+            else if (Cesium.defined(pickedFeature.id)) {
+              const entity = pickedFeature.id;
+              infoHtml += `<strong>Entity ID:</strong> ${entity.id}<br>`;
+              if (entity.name) {
+                infoHtml += `<strong>Name:</strong> ${entity.name}<br>`;
+              }
+              if (entity.description) {
+                infoHtml += `<strong>Description:</strong> ${entity.description.getValue()}<br>`;
+              }
+            }
+            // Generic object
+            else {
+              infoHtml += 'Feature selected<br>';
+              infoHtml += `<strong>Type:</strong> ${pickedFeature.constructor.name}<br>`;
+            }
+
+            infoPanel.innerHTML = infoHtml;
+          } else {
+            infoPanel.innerHTML = '<strong>No feature selected</strong><br><br>Click on a feature to inspect it.';
+          }
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+      } else {
+        button.classList.remove('active');
+        document.getElementById('infoPanel').classList.remove('visible');
+
+        if (inspectionHandler) {
+          inspectionHandler.removeInputAction(Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        }
+      }
+    }
+
+    // ===== 3D TILES INSPECTOR =====
+
+    let inspectorEnabled = false;
+
+    function toggle3DTilesInspector() {
+      inspectorEnabled = !inspectorEnabled;
+      const button = document.getElementById('toggleInspector');
+
+      if (inspectorEnabled) {
+        button.classList.add('active');
+        if (!viewer.cesium3DTilesInspector) {
+          viewer.extend(Cesium.viewerCesium3DTilesInspectorMixin);
+        }
+        const inspectorContainer = viewer.cesium3DTilesInspector.container;
+        inspectorContainer.style.display = 'block';
+      } else {
+        button.classList.remove('active');
+        if (viewer.cesium3DTilesInspector) {
+          viewer.cesium3DTilesInspector.container.style.display = 'none';
+        }
+      }
+    }
+
+    // ===== LAYER CONTROLS =====
+
+    // Tileset visibility
+    document.getElementById('tilesetVisible').addEventListener('change', function(e) {
+      if (tileset) {
+        tileset.show = e.target.checked;
+      }
+    });
+
+    // Tileset opacity
+    document.getElementById('tilesetOpacity').addEventListener('input', function(e) {
+      if (tileset) {
+        const opacity = parseFloat(e.target.value) / 100;
+        tileset.style = new Cesium.Cesium3DTileStyle({
+          color: `color("white", ${opacity})`
+        });
+      }
+    });
+
+    // Terrain visibility
+    document.getElementById('terrainVisible').addEventListener('change', function(e) {
+      viewer.scene.globe.show = e.target.checked;
+    });
+
+    // Imagery visibility
+    document.getElementById('imageryVisible').addEventListener('change', function(e) {
+      const layers = viewer.imageryLayers;
+      for (let i = 0; i < layers.length; i++) {
+        layers.get(i).show = e.target.checked;
+      }
+    });
+
+    // ===== BUTTON EVENT LISTENERS =====
+
+    document.getElementById('measureDistance').addEventListener('click', startDistanceMeasurement);
+    document.getElementById('measureArea').addEventListener('click', startAreaMeasurement);
+    document.getElementById('clearMeasurements').addEventListener('click', clearAllMeasurements);
+    document.getElementById('inspectFeatures').addEventListener('click', toggleFeatureInspection);
+    document.getElementById('toggleInspector').addEventListener('click', toggle3DTilesInspector);
+
+    // ===== INITIALIZATION MESSAGE =====
+
+    console.log('Cesium 3D Tileset Viewer initialized');
+    console.log('Tileset Asset ID: 4019912');
+    console.log('Use the toolbar to access measurement and inspection tools');
+  </script>
+</body>
+</html>
