@@ -1,22 +1,14 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Use correct character set. -->
     <meta charset="utf-8" />
-    <!-- Tell IE to use the latest, best version. -->
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <!-- Make the application on mobile take up the full browser screen and disable user scaling. -->
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
     <title>Survey Data Viewer with Measurements</title>
     <script src="../Build/CesiumUnminified/Cesium.js"></script>
     <style>
       @import url(../Build/CesiumUnminified/Widgets/widgets.css);
-      html,
-      body,
-      #cesiumContainer {
+      html, body, #cesiumContainer {
         width: 100%;
         height: 100%;
         margin: 0;
@@ -29,7 +21,7 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0, 0, 0, 0.8);
         color: white;
         padding: 20px 40px;
         border-radius: 5px;
@@ -41,7 +33,7 @@
         display: none;
       }
 
-      #measurementToolbar {
+      #toolbar {
         position: absolute;
         top: 10px;
         left: 10px;
@@ -53,12 +45,19 @@
         font-family: Arial, sans-serif;
       }
 
+      .toolbar-title {
+        color: white;
+        font-weight: bold;
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+
       .tool-button {
         background: #4CAF50;
         color: white;
         border: none;
         padding: 10px 15px;
-        margin: 5px;
+        margin: 5px 5px 5px 0;
         border-radius: 5px;
         cursor: pointer;
         font-size: 14px;
@@ -81,6 +80,16 @@
         background: #da190b;
       }
 
+      #instructions {
+        color: #ffd700;
+        font-size: 12px;
+        margin-top: 10px;
+        padding: 10px;
+        background: rgba(255, 215, 0, 0.1);
+        border-radius: 5px;
+        min-height: 20px;
+      }
+
       #resultsPanel {
         position: absolute;
         top: 10px;
@@ -91,6 +100,7 @@
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         z-index: 100;
         min-width: 250px;
+        max-width: 350px;
         max-height: 400px;
         overflow-y: auto;
         font-family: Arial, sans-serif;
@@ -112,24 +122,8 @@
       }
 
       .result-value {
-        font-size: 14px;
+        font-size: 13px;
         color: #fff;
-      }
-
-      #instructions {
-        color: #ffd700;
-        font-size: 12px;
-        margin-top: 10px;
-        padding: 10px;
-        background: rgba(255, 215, 0, 0.1);
-        border-radius: 5px;
-      }
-
-      .toolbar-title {
-        color: white;
-        font-weight: bold;
-        margin-bottom: 10px;
-        font-size: 16px;
       }
     </style>
   </head>
@@ -137,19 +131,22 @@
     <div id="cesiumContainer"></div>
     <div id="loadingOverlay">Loading survey data...</div>
 
-    <div id="measurementToolbar">
+    <div id="toolbar">
       <div class="toolbar-title">📏 Measurement Tools</div>
       <button class="tool-button" id="distanceBtn">Distance</button>
       <button class="tool-button" id="areaBtn">Area</button>
       <button class="tool-button" id="heightBtn">Height</button>
-      <button class="tool-button" id="pointBtn">Coordinates</button>
+      <button class="tool-button" id="pointBtn">Point Info</button>
+      <br>
       <button class="tool-button clear" id="clearBtn">Clear All</button>
-      <div id="instructions">Select a tool and click on the map</div>
+      <div id="instructions">Select a measurement tool to begin</div>
     </div>
 
     <div id="resultsPanel">
       <div class="toolbar-title">📊 Measurements</div>
-      <div id="resultsList"></div>
+      <div id="resultsList">
+        <div style="color: #999; font-size: 12px; font-style: italic;">No measurements yet</div>
+      </div>
     </div>
 
     <script>
@@ -194,23 +191,49 @@
         }
       }
 
+      // Helper function to get 3D position from screen click
+      function getPositionFromClick(clickPosition) {
+        // First, try picking a 3D object
+        const pickedObject = viewer.scene.pick(clickPosition);
+
+        if (Cesium.defined(pickedObject)) {
+          // If we picked something, get the cartesian position
+          const cartesian = viewer.scene.pickPosition(clickPosition);
+          if (Cesium.defined(cartesian)) {
+            return cartesian;
+          }
+        }
+
+        // Fall back to terrain/globe picking
+        const ray = viewer.camera.getPickRay(clickPosition);
+        const position = viewer.scene.globe.pick(ray, viewer.scene);
+
+        return position;
+      }
+
       // Utility functions
       function formatDistance(meters) {
         if (meters < 1000) {
           return meters.toFixed(2) + ' m';
         }
-        return (meters / 1000).toFixed(2) + ' km';
+        return (meters / 1000).toFixed(3) + ' km';
       }
 
       function formatArea(squareMeters) {
         if (squareMeters < 10000) {
           return squareMeters.toFixed(2) + ' m²';
         }
-        return (squareMeters / 10000).toFixed(2) + ' ha';
+        return (squareMeters / 10000).toFixed(3) + ' ha';
       }
 
       function addResult(title, value) {
         const resultsList = document.getElementById('resultsList');
+
+        // Remove "no measurements" message if present
+        if (resultsList.querySelector('[style*="font-style: italic"]')) {
+          resultsList.innerHTML = '';
+        }
+
         const resultItem = document.createElement('div');
         resultItem.className = 'result-item';
         resultItem.innerHTML = `
@@ -249,35 +272,24 @@
         const entity = viewer.entities.add({
           polyline: {
             positions: positions,
-            width: 3,
-            material: Cesium.Color.YELLOW,
-            clampToGround: true
+            width: 4,
+            material: Cesium.Color.YELLOW
           }
         });
         activeEntities.push(entity);
 
-        // Add labels at points
+        // Add points
         positions.forEach((pos, idx) => {
-          const label = viewer.entities.add({
+          const point = viewer.entities.add({
             position: pos,
             point: {
-              pixelSize: 8,
+              pixelSize: 10,
               color: Cesium.Color.RED,
               outlineColor: Cesium.Color.WHITE,
               outlineWidth: 2
-            },
-            label: {
-              text: idx === 0 ? 'Start' : 'End',
-              font: '14px sans-serif',
-              fillColor: Cesium.Color.WHITE,
-              outlineColor: Cesium.Color.BLACK,
-              outlineWidth: 2,
-              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-              pixelOffset: new Cesium.Cartesian2(0, -10)
             }
           });
-          activeEntities.push(label);
+          activeEntities.push(point);
         });
 
         // Add distance label at midpoint
@@ -301,25 +313,40 @@
 
         addResult(`Distance #${++measurementCount}`, formatDistance(distance));
         setActiveTool(null);
-        updateInstructions('Measurement complete. Select a tool to continue.');
+        updateInstructions('Measurement complete! Select another tool.');
       }
 
       // Area measurement
       function measureArea(positions) {
         if (positions.length < 3) return;
 
-        // Close the polygon
-        const closedPositions = [...positions, positions[0]];
-
-        // Calculate area using polygon area formula
+        // Calculate area
         const ellipsoid = viewer.scene.globe.ellipsoid;
-        const area = calculatePolygonArea(positions, ellipsoid);
+        const cartographics = positions.map(pos => ellipsoid.cartesianToCartographic(pos));
+
+        // Simple area calculation
+        let area = 0;
+        for (let i = 0; i < cartographics.length; i++) {
+          const j = (i + 1) % cartographics.length;
+          const lon1 = cartographics[i].longitude;
+          const lat1 = cartographics[i].latitude;
+          const lon2 = cartographics[j].longitude;
+          const lat2 = cartographics[j].latitude;
+          area += lon1 * lat2 - lon2 * lat1;
+        }
+        area = Math.abs(area) / 2.0;
+
+        // Convert to square meters (approximate)
+        const avgLat = cartographics.reduce((sum, c) => sum + c.latitude, 0) / cartographics.length;
+        const metersPerDegree = 111320;
+        const latFactor = Math.cos(avgLat);
+        area = Math.abs(area * metersPerDegree * metersPerDegree * latFactor);
 
         // Draw polygon
         const entity = viewer.entities.add({
           polygon: {
-            hierarchy: positions,
-            material: Cesium.Color.GREEN.withAlpha(0.3),
+            hierarchy: new Cesium.PolygonHierarchy(positions),
+            material: Cesium.Color.GREEN.withAlpha(0.4),
             outline: true,
             outlineColor: Cesium.Color.GREEN,
             outlineWidth: 3
@@ -328,11 +355,11 @@
         activeEntities.push(entity);
 
         // Add markers at vertices
-        positions.forEach((pos, idx) => {
+        positions.forEach((pos) => {
           const marker = viewer.entities.add({
             position: pos,
             point: {
-              pixelSize: 8,
+              pixelSize: 10,
               color: Cesium.Color.GREEN,
               outlineColor: Cesium.Color.WHITE,
               outlineWidth: 2
@@ -359,29 +386,9 @@
         });
         activeEntities.push(areaLabel);
 
-        addResult(`Area #${++measurementCount}`, formatArea(area));
+        addResult(`Area #${++measurementCount}`, formatArea(area) + ' (' + positions.length + ' points)');
         setActiveTool(null);
-        updateInstructions('Measurement complete. Select a tool to continue.');
-      }
-
-      function calculatePolygonArea(positions, ellipsoid) {
-        // Convert to cartographic for area calculation
-        const cartographics = positions.map(pos => ellipsoid.cartesianToCartographic(pos));
-
-        let area = 0;
-        for (let i = 0; i < cartographics.length; i++) {
-          const j = (i + 1) % cartographics.length;
-          area += cartographics[i].longitude * cartographics[j].latitude;
-          area -= cartographics[j].longitude * cartographics[i].latitude;
-        }
-        area = Math.abs(area) / 2.0;
-
-        // Convert to square meters (approximate)
-        const avgLatitude = cartographics.reduce((sum, c) => sum + c.latitude, 0) / cartographics.length;
-        const metersPerDegree = 111320; // at equator
-        const latitudeFactor = Math.cos(avgLatitude);
-
-        return Math.abs(area * metersPerDegree * metersPerDegree * latitudeFactor);
+        updateInstructions('Measurement complete! Select another tool.');
       }
 
       // Height measurement
@@ -392,40 +399,43 @@
         const carto1 = ellipsoid.cartesianToCartographic(positions[0]);
         const carto2 = ellipsoid.cartesianToCartographic(positions[1]);
 
-        const heightDiff = Math.abs(carto2.height - carto1.height);
+        const height1 = carto1.height;
+        const height2 = carto2.height;
+        const heightDiff = Math.abs(height2 - height1);
 
-        // Draw vertical line
+        // Draw line
         const entity = viewer.entities.add({
           polyline: {
             positions: positions,
-            width: 3,
+            width: 4,
             material: new Cesium.PolylineDashMaterialProperty({
-              color: Cesium.Color.CYAN
+              color: Cesium.Color.CYAN,
+              dashLength: 16
             })
           }
         });
         activeEntities.push(entity);
 
-        // Add markers
-        positions.forEach((pos, idx) => {
-          const carto = ellipsoid.cartesianToCartographic(pos);
+        // Add markers with elevation labels
+        [positions[0], positions[1]].forEach((pos, idx) => {
+          const h = idx === 0 ? height1 : height2;
           const marker = viewer.entities.add({
             position: pos,
             point: {
-              pixelSize: 8,
+              pixelSize: 10,
               color: Cesium.Color.CYAN,
               outlineColor: Cesium.Color.WHITE,
               outlineWidth: 2
             },
             label: {
-              text: `${carto.height.toFixed(2)} m`,
+              text: h.toFixed(2) + ' m',
               font: '12px sans-serif',
               fillColor: Cesium.Color.WHITE,
               outlineColor: Cesium.Color.BLACK,
               outlineWidth: 2,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
               verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-              pixelOffset: new Cesium.Cartesian2(0, -10)
+              pixelOffset: new Cesium.Cartesian2(0, -15)
             }
           });
           activeEntities.push(marker);
@@ -436,7 +446,7 @@
         const heightLabel = viewer.entities.add({
           position: midpoint,
           label: {
-            text: `Δ ${heightDiff.toFixed(2)} m`,
+            text: 'Δ ' + heightDiff.toFixed(2) + ' m',
             font: '16px sans-serif',
             fillColor: Cesium.Color.CYAN,
             outlineColor: Cesium.Color.BLACK,
@@ -449,14 +459,16 @@
         });
         activeEntities.push(heightLabel);
 
-        addResult(`Height Difference #${++measurementCount}`,
-          `Δ ${heightDiff.toFixed(2)} m<br>Start: ${carto1.height.toFixed(2)} m<br>End: ${carto2.height.toFixed(2)} m`);
+        addResult(
+          `Height Difference #${++measurementCount}`,
+          `Δ ${heightDiff.toFixed(2)} m<br>Point 1: ${height1.toFixed(2)} m<br>Point 2: ${height2.toFixed(2)} m`
+        );
         setActiveTool(null);
-        updateInstructions('Measurement complete. Select a tool to continue.');
+        updateInstructions('Measurement complete! Select another tool.');
       }
 
       // Point coordinates
-      function showCoordinates(position) {
+      function showPointInfo(position) {
         const ellipsoid = viewer.scene.globe.ellipsoid;
         const cartographic = ellipsoid.cartesianToCartographic(position);
         const longitude = Cesium.Math.toDegrees(cartographic.longitude).toFixed(6);
@@ -466,7 +478,7 @@
         const marker = viewer.entities.add({
           position: position,
           point: {
-            pixelSize: 10,
+            pixelSize: 12,
             color: Cesium.Color.MAGENTA,
             outlineColor: Cesium.Color.WHITE,
             outlineWidth: 2
@@ -479,7 +491,7 @@
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new Cesium.Cartesian2(0, -15),
+            pixelOffset: new Cesium.Cartesian2(0, -20),
             backgroundColor: new Cesium.Color(0, 0, 0, 0.7),
             showBackground: true,
             backgroundPadding: new Cesium.Cartesian2(7, 5)
@@ -487,10 +499,14 @@
         });
         activeEntities.push(marker);
 
-        addResult(`Point #${++measurementCount}`,
-          `Lat: ${latitude}°<br>Lon: ${longitude}°<br>Height: ${height} m`);
-        setActiveTool(null);
-        updateInstructions('Point added. Select a tool to continue.');
+        addResult(
+          `Point #${++measurementCount}`,
+          `Lat: ${latitude}°<br>Lon: ${longitude}°<br>Elevation: ${height} m`
+        );
+
+        // Don't automatically deactivate for point tool, allow multiple points
+        measurementPoints = [];
+        updateInstructions('Click to add another point, or select a different tool');
       }
 
       // Click handler
@@ -498,27 +514,36 @@
       handler.setInputAction(function(click) {
         if (!activeTool) return;
 
-        const ray = viewer.camera.getPickRay(click.position);
-        const position = viewer.scene.globe.pick(ray, viewer.scene);
+        const position = getPositionFromClick(click.position);
 
-        if (!Cesium.defined(position)) return;
+        if (!Cesium.defined(position)) {
+          updateInstructions('❌ Could not get position. Try clicking on the terrain or model.');
+          return;
+        }
 
         measurementPoints.push(position);
 
-        if (activeTool === 'distance' && measurementPoints.length === 1) {
-          updateInstructions('Click second point to measure distance');
-        } else if (activeTool === 'distance' && measurementPoints.length === 2) {
-          measureDistance(measurementPoints);
-        } else if (activeTool === 'area' && measurementPoints.length < 3) {
-          updateInstructions(`Point ${measurementPoints.length}/3 - Click ${3 - measurementPoints.length} more point(s)`);
-        } else if (activeTool === 'area' && measurementPoints.length === 3) {
-          measureArea(measurementPoints);
-        } else if (activeTool === 'height' && measurementPoints.length === 1) {
-          updateInstructions('Click second point to measure height difference');
-        } else if (activeTool === 'height' && measurementPoints.length === 2) {
-          measureHeight(measurementPoints);
+        // Handle different tools
+        if (activeTool === 'distance') {
+          if (measurementPoints.length === 1) {
+            updateInstructions('Click second point to complete distance measurement');
+          } else if (measurementPoints.length === 2) {
+            measureDistance(measurementPoints);
+          }
+        } else if (activeTool === 'area') {
+          if (measurementPoints.length < 3) {
+            updateInstructions(`Point ${measurementPoints.length} added. Click ${3 - measurementPoints.length} more point(s) for area`);
+          } else if (measurementPoints.length === 3) {
+            measureArea(measurementPoints);
+          }
+        } else if (activeTool === 'height') {
+          if (measurementPoints.length === 1) {
+            updateInstructions('Click second point to measure height difference');
+          } else if (measurementPoints.length === 2) {
+            measureHeight(measurementPoints);
+          }
         } else if (activeTool === 'point') {
-          showCoordinates(position);
+          showPointInfo(position);
         }
       }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -530,17 +555,17 @@
 
       document.getElementById('areaBtn').addEventListener('click', function() {
         setActiveTool('area');
-        updateInstructions('Click first point to start area measurement (3 points required)');
+        updateInstructions('Click 3 points to measure triangular area');
       });
 
       document.getElementById('heightBtn').addEventListener('click', function() {
         setActiveTool('height');
-        updateInstructions('Click first point to start height measurement');
+        updateInstructions('Click first point to start height/elevation measurement');
       });
 
       document.getElementById('pointBtn').addEventListener('click', function() {
         setActiveTool('point');
-        updateInstructions('Click on map to get coordinates');
+        updateInstructions('Click on the map to get point coordinates and elevation');
       });
 
       document.getElementById('clearBtn').addEventListener('click', function() {
@@ -549,14 +574,14 @@
         activeEntities = [];
 
         // Clear results
-        document.getElementById('resultsList').innerHTML = '';
+        document.getElementById('resultsList').innerHTML = '<div style="color: #999; font-size: 12px; font-style: italic;">No measurements yet</div>';
 
         // Reset state
         setActiveTool(null);
         measurementPoints = [];
         measurementCount = 0;
 
-        updateInstructions('All measurements cleared. Select a tool to continue.');
+        updateInstructions('All measurements cleared. Select a tool to begin.');
       });
 
       // Load the survey data
