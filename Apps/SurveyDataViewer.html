@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Use correct character set. -->
+    <meta charset="utf-8" />
+    <!-- Tell IE to use the latest, best version. -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <!-- Make the application on mobile take up the full browser screen and disable user scaling. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"
+    />
+    <title>Survey Data Viewer</title>
+    <script src="../Build/CesiumUnminified/Cesium.js"></script>
+    <style>
+      @import url(../Build/CesiumUnminified/Widgets/widgets.css);
+      html,
+      body,
+      #cesiumContainer {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      #loadingOverlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 20px 40px;
+        border-radius: 5px;
+        font-family: Arial, sans-serif;
+        z-index: 1000;
+      }
+
+      #loadingOverlay.hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+    <div id="loadingOverlay">Loading survey data...</div>
+    <script>
+      // Set your Cesium Ion access token
+      Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1YjNkM2E2Zi00NGJmLTRkMjUtOTZkNy00MjFjOWQ3N2MxNjQiLCJpZCI6MzU3ODExLCJpYXQiOjE3NjI0MjkyNjN9.k797g8NHlPMrHU1pO0_bWk_-1K3PgyWRJ_rTItxWhA0';
+
+      // Create the Cesium Viewer
+      const viewer = new Cesium.Viewer("cesiumContainer", {
+        terrainProvider: Cesium.createWorldTerrain(),
+        timeline: true,
+        animation: true,
+        baseLayerPicker: true,
+        geocoder: true,
+        homeButton: true,
+        sceneModePicker: true,
+        navigationHelpButton: true,
+        fullscreenButton: true
+      });
+
+      // Load the 3D tileset from your Ion asset
+      async function loadSurveyData() {
+        try {
+          const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(4019912);
+          viewer.scene.primitives.add(tileset);
+
+          // Fly to the tileset once it's loaded
+          await viewer.zoomTo(tileset);
+
+          // Hide loading overlay
+          document.getElementById('loadingOverlay').classList.add('hidden');
+
+          console.log('Survey data loaded successfully');
+        } catch (error) {
+          console.error('Error loading survey data:', error);
+          document.getElementById('loadingOverlay').textContent = 'Error loading survey data: ' + error.message;
+        }
+      }
+
+      // Load the survey data
+      loadSurveyData();
+    </script>
+  </body>
+</html>
