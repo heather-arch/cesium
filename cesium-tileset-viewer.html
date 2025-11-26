@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cesium 3D Tileset Viewer</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .tool-btn {
+      width: 44px;
+      height: 44px;
+      background: rgba(48, 51, 54, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .tool-btn:hover {
+      background: rgba(72, 75, 78, 0.95);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .tool-btn.active {
+      background: #4a90d9;
+      border-color: #6ba3e0;
+    }
+
+    .tool-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: currentColor;
+    }
+
+    /* Panels */
+    .panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 300px;
+      max-height: calc(100vh - 20px);
+      background: rgba(38, 41, 44, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      color: #fff;
+      z-index: 1000;
+      display: none;
+      overflow: hidden;
+    }
+
+    .panel.visible {
+      display: block;
+    }
+
+    .panel-header {
+      padding: 12px 15px;
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+    }
+
+    .panel-close {
+      background: none;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .panel-close:hover {
+      color: #fff;
+    }
+
+    .panel-content {
+      padding: 15px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    /* Layers Panel */
+    .layer-item {
+      display: flex;
+      align-items: center;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+
+    .layer-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .layer-toggle {
+      width: 18px;
+      height: 18px;
+      margin-right: 10px;
+      cursor: pointer;
+    }
+
+    .layer-name {
+      flex: 1;
+      font-size: 14px;
+    }
+
+    .layer-opacity {
+      width: 60px;
+      margin-left: 10px;
+    }
+
+    /* Measure Panel */
+    .measure-type {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+
+    .measure-btn {
+      flex: 1;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .measure-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .measure-btn.active {
+      background: #4a90d9;
+      border-color: #6ba3e0;
+    }
+
+    .measure-result {
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      font-size: 14px;
+      min-height: 60px;
+    }
+
+    .measure-result-label {
+      color: #999;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .measure-result-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #4a90d9;
+    }
+
+    .clear-btn {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      background: rgba(220, 53, 69, 0.8);
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .clear-btn:hover {
+      background: rgba(220, 53, 69, 1);
+    }
+
+    /* Project Features Panel */
+    .feature-item {
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .feature-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .feature-name {
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .feature-coords {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .add-feature-btn {
+      width: 100%;
+      padding: 12px;
+      background: #4a90d9;
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+
+    .add-feature-btn:hover {
+      background: #5a9de9;
+    }
+
+    /* View Controls */
+    .view-presets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+
+    .view-preset-btn {
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .view-preset-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .slider-group {
+      margin-bottom: 15px;
+    }
+
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+
+    .slider-input {
+      width: 100%;
+    }
+
+    /* Info Box */
+    .info-box {
+      position: absolute;
+      bottom: 40px;
+      left: 10px;
+      background: rgba(38, 41, 44, 0.9);
+      padding: 10px 15px;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 12px;
+      z-index: 1000;
+    }
+
+    .info-box span {
+      margin-right: 15px;
+    }
+
+    /* Loading indicator */
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .loading-spinner {
+      text-align: center;
+      color: #fff;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #4a90d9;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Tooltip */
+    .tool-tooltip {
+      position: absolute;
+      left: 55px;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .tool-btn:hover .tool-tooltip {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner">
+      <div class="spinner"></div>
+      <div>Loading 3D Tileset...</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <button class="tool-btn" id="layersBtn" title="Layers">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span class="tool-tooltip">Layers</span>
+    </button>
+    <button class="tool-btn" id="measureBtn" title="Measure">
+      <svg viewBox="0 0 24 24"><path d="M3 21h18v-2H3v2zm0-4h18v-2H3v2zm0-4h18v-2H3v2zm0-4h18V7H3v2zm0-6v2h18V3H3z"/></svg>
+      <span class="tool-tooltip">Measure</span>
+    </button>
+    <button class="tool-btn" id="featuresBtn" title="Project Features">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      <span class="tool-tooltip">Features</span>
+    </button>
+    <button class="tool-btn" id="viewBtn" title="View Options">
+      <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+      <span class="tool-tooltip">View</span>
+    </button>
+    <button class="tool-btn" id="homeBtn" title="Reset View">
+      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      <span class="tool-tooltip">Home</span>
+    </button>
+  </div>
+
+  <!-- Layers Panel -->
+  <div class="panel" id="layersPanel">
+    <div class="panel-header">
+      <span>Layers</span>
+      <button class="panel-close" onclick="closePanel('layersPanel')">&times;</button>
+    </div>
+    <div class="panel-content">
+      <div class="layer-item">
+        <input type="checkbox" class="layer-toggle" id="tilesetToggle" checked />
+        <span class="layer-name">3D Tileset</span>
+        <input type="range" class="layer-opacity" id="tilesetOpacity" min="0" max="100" value="100" />
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" class="layer-toggle" id="terrainToggle" checked />
+        <span class="layer-name">Terrain</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" class="layer-toggle" id="imageryToggle" checked />
+        <span class="layer-name">Base Imagery</span>
+        <input type="range" class="layer-opacity" id="imageryOpacity" min="0" max="100" value="100" />
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" class="layer-toggle" id="atmosphereToggle" checked />
+        <span class="layer-name">Atmosphere</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Measure Panel -->
+  <div class="panel" id="measurePanel">
+    <div class="panel-header">
+      <span>Measure</span>
+      <button class="panel-close" onclick="closePanel('measurePanel')">&times;</button>
+    </div>
+    <div class="panel-content">
+      <div class="measure-type">
+        <button class="measure-btn" id="measureDistance">Distance</button>
+        <button class="measure-btn" id="measureArea">Area</button>
+        <button class="measure-btn" id="measureHeight">Height</button>
+      </div>
+      <div class="measure-result">
+        <div class="measure-result-label">Result</div>
+        <div class="measure-result-value" id="measureValue">Click to start measuring</div>
+      </div>
+      <button class="clear-btn" id="clearMeasure">Clear Measurements</button>
+    </div>
+  </div>
+
+  <!-- Features Panel -->
+  <div class="panel" id="featuresPanel">
+    <div class="panel-header">
+      <span>Project Features</span>
+      <button class="panel-close" onclick="closePanel('featuresPanel')">&times;</button>
+    </div>
+    <div class="panel-content">
+      <button class="add-feature-btn" id="addFeatureBtn">+ Add Feature (Click on Map)</button>
+      <div id="featuresList"></div>
+    </div>
+  </div>
+
+  <!-- View Panel -->
+  <div class="panel" id="viewPanel">
+    <div class="panel-header">
+      <span>View Options</span>
+      <button class="panel-close" onclick="closePanel('viewPanel')">&times;</button>
+    </div>
+    <div class="panel-content">
+      <div class="view-presets">
+        <button class="view-preset-btn" onclick="setViewPreset('top')">Top Down</button>
+        <button class="view-preset-btn" onclick="setViewPreset('north')">North</button>
+        <button class="view-preset-btn" onclick="setViewPreset('south')">South</button>
+        <button class="view-preset-btn" onclick="setViewPreset('east')">East</button>
+        <button class="view-preset-btn" onclick="setViewPreset('west')">West</button>
+        <button class="view-preset-btn" onclick="setViewPreset('perspective')">Perspective</button>
+      </div>
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>Field of View</span>
+          <span id="fovValue">60°</span>
+        </div>
+        <input type="range" class="slider-input" id="fovSlider" min="10" max="120" value="60" />
+      </div>
+      <div class="slider-group">
+        <div class="slider-label">
+          <span>Screen Space Error</span>
+          <span id="sseValue">16</span>
+        </div>
+        <input type="range" class="slider-input" id="sseSlider" min="1" max="64" value="16" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Info Box -->
+  <div class="info-box" id="infoBox">
+    <span>Lat: <span id="latValue">--</span></span>
+    <span>Lon: <span id="lonValue">--</span></span>
+    <span>Height: <span id="heightValue">--</span></span>
+  </div>
+
+  <script>
+    // Cesium Ion access token
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2NDQwZmY1Ny05OWFlLTQ4ZTgtYWFjNS0yZWY4YzYyZTM1ZmIiLCJpZCI6MzU3ODExLCJpYXQiOjE3NjI0MjkxNjB9.OxogfbQax9huxXihwGkJ9GemU8rj2M4WhUweWguwS-Y';
+
+    // Initialize viewer
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      terrain: Cesium.Terrain.fromWorldTerrain(),
+      animation: false,
+      timeline: false,
+      baseLayerPicker: false,
+      fullscreenButton: true,
+      vrButton: false,
+      geocoder: true,
+      homeButton: false,
+      infoBox: true,
+      sceneModePicker: true,
+      selectionIndicator: true,
+      navigationHelpButton: false,
+      navigationInstructionsInitiallyVisible: false,
+    });
+
+    // Variables
+    let tileset = null;
+    let measureMode = null;
+    let measurePoints = [];
+    let measureEntities = [];
+    let featureMode = false;
+    let features = [];
+    let featureCounter = 1;
+
+    // Load the 3D Tileset
+    async function loadTileset() {
+      try {
+        tileset = await Cesium.Cesium3DTileset.fromIonAssetId(4019912);
+        viewer.scene.primitives.add(tileset);
+
+        // Zoom to tileset
+        await viewer.zoomTo(tileset);
+
+        // Hide loading overlay
+        document.getElementById('loadingOverlay').style.display = 'none';
+
+        console.log('Tileset loaded successfully');
+      } catch (error) {
+        console.error('Error loading tileset:', error);
+        document.getElementById('loadingOverlay').innerHTML =
+          '<div class="loading-spinner"><div style="color: #ff6b6b;">Error loading tileset</div><div style="font-size: 12px; margin-top: 10px;">' + error.message + '</div></div>';
+      }
+    }
+
+    loadTileset();
+
+    // Panel management
+    function closePanel(panelId) {
+      document.getElementById(panelId).classList.remove('visible');
+      document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+    }
+
+    function togglePanel(panelId, btnId) {
+      const panel = document.getElementById(panelId);
+      const btn = document.getElementById(btnId);
+      const isVisible = panel.classList.contains('visible');
+
+      // Close all panels
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('visible'));
+      document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+
+      if (!isVisible) {
+        panel.classList.add('visible');
+        btn.classList.add('active');
+      }
+    }
+
+    // Toolbar buttons
+    document.getElementById('layersBtn').onclick = () => togglePanel('layersPanel', 'layersBtn');
+    document.getElementById('measureBtn').onclick = () => togglePanel('measurePanel', 'measureBtn');
+    document.getElementById('featuresBtn').onclick = () => togglePanel('featuresPanel', 'featuresBtn');
+    document.getElementById('viewBtn').onclick = () => togglePanel('viewPanel', 'viewBtn');
+    document.getElementById('homeBtn').onclick = () => {
+      if (tileset) {
+        viewer.zoomTo(tileset);
+      }
+    };
+
+    // Layer controls
+    document.getElementById('tilesetToggle').onchange = (e) => {
+      if (tileset) tileset.show = e.target.checked;
+    };
+
+    document.getElementById('tilesetOpacity').oninput = (e) => {
+      if (tileset) {
+        tileset.style = new Cesium.Cesium3DTileStyle({
+          color: `color('white', ${e.target.value / 100})`
+        });
+      }
+    };
+
+    document.getElementById('terrainToggle').onchange = (e) => {
+      viewer.scene.globe.show = e.target.checked;
+    };
+
+    document.getElementById('imageryToggle').onchange = (e) => {
+      viewer.scene.globe.showGroundAtmosphere = e.target.checked;
+      viewer.scene.imageryLayers.get(0).show = e.target.checked;
+    };
+
+    document.getElementById('imageryOpacity').oninput = (e) => {
+      viewer.scene.imageryLayers.get(0).alpha = e.target.value / 100;
+    };
+
+    document.getElementById('atmosphereToggle').onchange = (e) => {
+      viewer.scene.skyAtmosphere.show = e.target.checked;
+    };
+
+    // Measure functionality
+    document.getElementById('measureDistance').onclick = () => setMeasureMode('distance');
+    document.getElementById('measureArea').onclick = () => setMeasureMode('area');
+    document.getElementById('measureHeight').onclick = () => setMeasureMode('height');
+    document.getElementById('clearMeasure').onclick = clearMeasurements;
+
+    function setMeasureMode(mode) {
+      clearMeasurements();
+      measureMode = mode;
+      featureMode = false;
+
+      document.querySelectorAll('.measure-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('measure' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
+      document.getElementById('measureValue').textContent = 'Click points on the map';
+    }
+
+    function clearMeasurements() {
+      measurePoints = [];
+      measureEntities.forEach(entity => viewer.entities.remove(entity));
+      measureEntities = [];
+      measureMode = null;
+      document.querySelectorAll('.measure-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('measureValue').textContent = 'Click to start measuring';
+    }
+
+    function addMeasurePoint(cartesian) {
+      measurePoints.push(cartesian);
+
+      // Add point entity
+      const point = viewer.entities.add({
+        position: cartesian,
+        point: {
+          pixelSize: 10,
+          color: Cesium.Color.YELLOW,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2
+        }
+      });
+      measureEntities.push(point);
+
+      if (measureMode === 'distance' && measurePoints.length >= 2) {
+        calculateDistance();
+      } else if (measureMode === 'area' && measurePoints.length >= 3) {
+        calculateArea();
+      } else if (measureMode === 'height' && measurePoints.length >= 2) {
+        calculateHeight();
+      }
+
+      // Draw lines
+      if (measurePoints.length > 1) {
+        const line = viewer.entities.add({
+          polyline: {
+            positions: measurePoints,
+            width: 3,
+            material: Cesium.Color.YELLOW
+          }
+        });
+        measureEntities.push(line);
+      }
+    }
+
+    function calculateDistance() {
+      let totalDistance = 0;
+      for (let i = 0; i < measurePoints.length - 1; i++) {
+        const start = Cesium.Cartographic.fromCartesian(measurePoints[i]);
+        const end = Cesium.Cartographic.fromCartesian(measurePoints[i + 1]);
+        const geodesic = new Cesium.EllipsoidGeodesic(start, end);
+        totalDistance += geodesic.surfaceDistance;
+      }
+
+      let displayValue;
+      if (totalDistance > 1000) {
+        displayValue = (totalDistance / 1000).toFixed(2) + ' km';
+      } else {
+        displayValue = totalDistance.toFixed(2) + ' m';
+      }
+      document.getElementById('measureValue').textContent = displayValue;
+    }
+
+    function calculateArea() {
+      const positions = measurePoints.map(p => Cesium.Cartographic.fromCartesian(p));
+
+      // Simple polygon area calculation (approximate)
+      let area = 0;
+      const n = positions.length;
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        area += positions[i].longitude * positions[j].latitude;
+        area -= positions[j].longitude * positions[i].latitude;
+      }
+      area = Math.abs(area / 2) * 6371000 * 6371000; // Earth radius squared
+
+      let displayValue;
+      if (area > 1000000) {
+        displayValue = (area / 1000000).toFixed(2) + ' km²';
+      } else {
+        displayValue = area.toFixed(2) + ' m²';
+      }
+      document.getElementById('measureValue').textContent = displayValue;
+
+      // Draw polygon
+      const polygon = viewer.entities.add({
+        polygon: {
+          hierarchy: measurePoints,
+          material: Cesium.Color.YELLOW.withAlpha(0.3),
+          outline: true,
+          outlineColor: Cesium.Color.YELLOW
+        }
+      });
+      measureEntities.push(polygon);
+    }
+
+    function calculateHeight() {
+      const start = Cesium.Cartographic.fromCartesian(measurePoints[0]);
+      const end = Cesium.Cartographic.fromCartesian(measurePoints[measurePoints.length - 1]);
+      const heightDiff = Math.abs(end.height - start.height);
+
+      document.getElementById('measureValue').textContent = heightDiff.toFixed(2) + ' m';
+    }
+
+    // Feature management
+    document.getElementById('addFeatureBtn').onclick = () => {
+      featureMode = !featureMode;
+      measureMode = null;
+      document.querySelectorAll('.measure-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('addFeatureBtn').textContent = featureMode ? 'Click on Map to Place' : '+ Add Feature (Click on Map)';
+      document.getElementById('addFeatureBtn').style.background = featureMode ? '#28a745' : '#4a90d9';
+    };
+
+    function addFeature(cartesian) {
+      const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+      const lat = Cesium.Math.toDegrees(cartographic.latitude).toFixed(6);
+      const lon = Cesium.Math.toDegrees(cartographic.longitude).toFixed(6);
+
+      const feature = {
+        id: 'feature_' + Date.now(),
+        name: 'Feature ' + featureCounter++,
+        position: cartesian,
+        lat: lat,
+        lon: lon
+      };
+
+      features.push(feature);
+
+      // Add entity
+      const entity = viewer.entities.add({
+        id: feature.id,
+        position: cartesian,
+        point: {
+          pixelSize: 12,
+          color: Cesium.Color.RED,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2
+        },
+        label: {
+          text: feature.name,
+          font: '14px sans-serif',
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -15),
+          fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE
+        }
+      });
+
+      updateFeaturesList();
+      featureMode = false;
+      document.getElementById('addFeatureBtn').textContent = '+ Add Feature (Click on Map)';
+      document.getElementById('addFeatureBtn').style.background = '#4a90d9';
+    }
+
+    function updateFeaturesList() {
+      const list = document.getElementById('featuresList');
+      list.innerHTML = features.map(f => `
+        <div class="feature-item" onclick="flyToFeature('${f.id}')">
+          <div class="feature-name">${f.name}</div>
+          <div class="feature-coords">Lat: ${f.lat}, Lon: ${f.lon}</div>
+        </div>
+      `).join('');
+    }
+
+    window.flyToFeature = function(id) {
+      const feature = features.find(f => f.id === id);
+      if (feature) {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(
+            parseFloat(feature.lon),
+            parseFloat(feature.lat),
+            500
+          )
+        });
+      }
+    };
+
+    // View controls
+    window.setViewPreset = function(preset) {
+      if (!tileset) return;
+
+      const boundingSphere = tileset.boundingSphere;
+      const center = boundingSphere.center;
+      const radius = boundingSphere.radius;
+
+      let heading = 0, pitch = -45, distance = radius * 2;
+
+      switch (preset) {
+        case 'top':
+          pitch = -90;
+          break;
+        case 'north':
+          heading = 0;
+          pitch = -30;
+          break;
+        case 'south':
+          heading = 180;
+          pitch = -30;
+          break;
+        case 'east':
+          heading = 90;
+          pitch = -30;
+          break;
+        case 'west':
+          heading = -90;
+          pitch = -30;
+          break;
+        case 'perspective':
+          heading = 45;
+          pitch = -30;
+          break;
+      }
+
+      viewer.camera.flyToBoundingSphere(boundingSphere, {
+        offset: new Cesium.HeadingPitchRange(
+          Cesium.Math.toRadians(heading),
+          Cesium.Math.toRadians(pitch),
+          distance
+        )
+      });
+    };
+
+    document.getElementById('fovSlider').oninput = (e) => {
+      const fov = parseInt(e.target.value);
+      viewer.camera.frustum.fov = Cesium.Math.toRadians(fov);
+      document.getElementById('fovValue').textContent = fov + '°';
+    };
+
+    document.getElementById('sseSlider').oninput = (e) => {
+      const sse = parseInt(e.target.value);
+      if (tileset) {
+        tileset.maximumScreenSpaceError = sse;
+      }
+      document.getElementById('sseValue').textContent = sse;
+    };
+
+    // Mouse click handler
+    const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+    handler.setInputAction((click) => {
+      const ray = viewer.camera.getPickRay(click.position);
+      const cartesian = viewer.scene.globe.pick(ray, viewer.scene);
+
+      if (cartesian) {
+        if (measureMode) {
+          addMeasurePoint(cartesian);
+        } else if (featureMode) {
+          addFeature(cartesian);
+        }
+      }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    // Mouse move handler for coordinate display
+    handler.setInputAction((movement) => {
+      const ray = viewer.camera.getPickRay(movement.endPosition);
+      const cartesian = viewer.scene.globe.pick(ray, viewer.scene);
+
+      if (cartesian) {
+        const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+        document.getElementById('latValue').textContent = Cesium.Math.toDegrees(cartographic.latitude).toFixed(6);
+        document.getElementById('lonValue').textContent = Cesium.Math.toDegrees(cartographic.longitude).toFixed(6);
+        document.getElementById('heightValue').textContent = cartographic.height.toFixed(1) + 'm';
+      }
+    }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+  </script>
+</body>
+</html>
