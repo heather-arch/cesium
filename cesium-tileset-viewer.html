@@ -519,6 +519,9 @@
     // Load the 3D Tileset
     async function loadTileset() {
       try {
+        console.log('Loading tileset with Asset ID: 4019912');
+        console.log('Using token:', Cesium.Ion.defaultAccessToken.substring(0, 50) + '...');
+
         tileset = await Cesium.Cesium3DTileset.fromIonAssetId(4019912);
         viewer.scene.primitives.add(tileset);
 
@@ -530,9 +533,24 @@
 
         console.log('Tileset loaded successfully');
       } catch (error) {
-        console.error('Error loading tileset:', error);
+        console.error('Full error object:', error);
+        console.error('Error loading tileset:', error.message || error);
+
+        let errorMsg = 'Unknown error';
+        if (error.message) {
+          errorMsg = error.message;
+        } else if (error.statusCode) {
+          errorMsg = 'HTTP ' + error.statusCode + ': Access denied or asset not found';
+        } else if (typeof error === 'string') {
+          errorMsg = error;
+        }
+
         document.getElementById('loadingOverlay').innerHTML =
-          '<div class="loading-spinner"><div style="color: #ff6b6b;">Error loading tileset</div><div style="font-size: 12px; margin-top: 10px;">' + error.message + '</div></div>';
+          '<div class="loading-spinner">' +
+          '<div style="color: #ff6b6b; font-size: 18px; margin-bottom: 15px;">Error loading tileset</div>' +
+          '<div style="font-size: 13px; color: #ccc; max-width: 400px; line-height: 1.5;">' + errorMsg + '</div>' +
+          '<div style="font-size: 12px; color: #999; margin-top: 15px;">Check browser console (F12) for details.<br>Verify your Ion access token and asset ID are correct.</div>' +
+          '</div>';
       }
     }
 
