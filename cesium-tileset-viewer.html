@@ -400,6 +400,11 @@
         <input type="range" class="layer-opacity" id="tilesetOpacity" min="0" max="100" value="100" />
       </div>
       <div class="layer-item">
+        <input type="checkbox" class="layer-toggle" id="ionImageryToggle" checked />
+        <span class="layer-name">Ion Imagery</span>
+        <input type="range" class="layer-opacity" id="ionImageryOpacity" min="0" max="100" value="100" />
+      </div>
+      <div class="layer-item">
         <input type="checkbox" class="layer-toggle" id="terrainToggle" checked />
         <span class="layer-name">Terrain</span>
       </div>
@@ -516,14 +521,25 @@
     let features = [];
     let featureCounter = 1;
 
-    // Load the 3D Tileset
-    async function loadTileset() {
+    // Ion imagery layer
+    let ionImageryLayer = null;
+
+    // Load the assets
+    async function loadAssets() {
       try {
-        console.log('Loading tileset with Asset ID: 4019912');
         console.log('Using token:', Cesium.Ion.defaultAccessToken.substring(0, 50) + '...');
 
+        // Load imagery layer (Asset ID: 4115848)
+        console.log('Loading imagery layer with Asset ID: 4115848');
+        const imageryProvider = await Cesium.IonImageryProvider.fromAssetId(4115848);
+        ionImageryLayer = viewer.imageryLayers.addImageryProvider(imageryProvider);
+        console.log('Imagery layer loaded successfully');
+
+        // Load 3D Tileset (Asset ID: 4019912)
+        console.log('Loading 3D tileset with Asset ID: 4019912');
         tileset = await Cesium.Cesium3DTileset.fromIonAssetId(4019912);
         viewer.scene.primitives.add(tileset);
+        console.log('3D Tileset loaded successfully');
 
         // Zoom to tileset
         await viewer.zoomTo(tileset);
@@ -531,10 +547,9 @@
         // Hide loading overlay
         document.getElementById('loadingOverlay').style.display = 'none';
 
-        console.log('Tileset loaded successfully');
       } catch (error) {
         console.error('Full error object:', error);
-        console.error('Error loading tileset:', error.message || error);
+        console.error('Error loading assets:', error.message || error);
 
         let errorMsg = 'Unknown error';
         if (error.message) {
@@ -547,14 +562,14 @@
 
         document.getElementById('loadingOverlay').innerHTML =
           '<div class="loading-spinner">' +
-          '<div style="color: #ff6b6b; font-size: 18px; margin-bottom: 15px;">Error loading tileset</div>' +
+          '<div style="color: #ff6b6b; font-size: 18px; margin-bottom: 15px;">Error loading assets</div>' +
           '<div style="font-size: 13px; color: #ccc; max-width: 400px; line-height: 1.5;">' + errorMsg + '</div>' +
-          '<div style="font-size: 12px; color: #999; margin-top: 15px;">Check browser console (F12) for details.<br>Verify your Ion access token and asset ID are correct.</div>' +
+          '<div style="font-size: 12px; color: #999; margin-top: 15px;">Check browser console (F12) for details.<br>Verify your Ion access token and asset IDs are correct.</div>' +
           '</div>';
       }
     }
 
-    loadTileset();
+    loadAssets();
 
     // Panel management
     function closePanel(panelId) {
@@ -599,6 +614,14 @@
           color: `color('white', ${e.target.value / 100})`
         });
       }
+    };
+
+    document.getElementById('ionImageryToggle').onchange = (e) => {
+      if (ionImageryLayer) ionImageryLayer.show = e.target.checked;
+    };
+
+    document.getElementById('ionImageryOpacity').oninput = (e) => {
+      if (ionImageryLayer) ionImageryLayer.alpha = e.target.value / 100;
     };
 
     document.getElementById('terrainToggle').onchange = (e) => {
