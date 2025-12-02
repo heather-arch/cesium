@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Custom Cesium Data Viewer</title>
+
+    <!-- Cesium CSS -->
+    <link rel="stylesheet" href="../../Build/Cesium/Widgets/widgets.css" />
+
+    <!-- Custom CSS -->
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body,
+      #cesiumContainer {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          Cantarell, sans-serif;
+      }
+
+      /* Control Panel */
+      #controlPanel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 320px;
+        background: rgba(42, 42, 42, 0.95);
+        color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        max-height: calc(100vh - 20px);
+        overflow-y: auto;
+      }
+
+      #controlPanel::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      #controlPanel::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+      }
+
+      #controlPanel::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+      }
+
+      .panel-header {
+        padding: 15px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 8px 8px 0 0;
+        font-weight: 600;
+        font-size: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .panel-section {
+        padding: 15px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .panel-section:last-child {
+        border-bottom: none;
+      }
+
+      .section-title {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #a0a0a0;
+        margin-bottom: 10px;
+      }
+
+      .button {
+        width: 100%;
+        padding: 10px 15px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        margin-bottom: 8px;
+      }
+
+      .button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .button:active {
+        transform: translateY(0);
+      }
+
+      .button-secondary {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .button-secondary:hover {
+        background: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+      }
+
+      .button-danger {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      }
+
+      input[type="file"] {
+        display: none;
+      }
+
+      .file-label {
+        display: block;
+        width: 100%;
+        padding: 10px 15px;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 2px dashed rgba(255, 255, 255, 0.3);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        text-align: center;
+        transition: all 0.3s ease;
+      }
+
+      .file-label:hover {
+        border-color: rgba(102, 126, 234, 0.6);
+        background: rgba(102, 126, 234, 0.1);
+      }
+
+      .layer-item {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 10px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .layer-name {
+        font-size: 13px;
+        flex-grow: 1;
+      }
+
+      .layer-controls {
+        display: flex;
+        gap: 5px;
+      }
+
+      .layer-btn {
+        padding: 4px 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border: none;
+        border-radius: 4px;
+        color: white;
+        cursor: pointer;
+        font-size: 11px;
+        transition: background 0.2s;
+      }
+
+      .layer-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .toggle-btn {
+        position: absolute;
+        top: 10px;
+        right: 340px;
+        background: rgba(42, 42, 42, 0.95);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 15px;
+        cursor: pointer;
+        font-size: 14px;
+        z-index: 1000;
+        transition: all 0.3s ease;
+      }
+
+      .toggle-btn:hover {
+        background: rgba(102, 126, 234, 0.95);
+      }
+
+      .info-box {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(42, 42, 42, 0.95);
+        color: white;
+        padding: 10px 15px;
+        border-radius: 6px;
+        font-size: 12px;
+        z-index: 1000;
+        max-width: 300px;
+      }
+
+      select,
+      input[type="text"],
+      input[type="number"] {
+        width: 100%;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        color: white;
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+
+      select:focus,
+      input:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      .checkbox-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .checkbox-container input[type="checkbox"] {
+        margin-right: 8px;
+      }
+
+      .checkbox-container label {
+        font-size: 13px;
+      }
+
+      #status {
+        padding: 8px 12px;
+        background: rgba(102, 126, 234, 0.2);
+        border-radius: 6px;
+        font-size: 12px;
+        margin-top: 10px;
+        display: none;
+      }
+
+      #status.show {
+        display: block;
+      }
+
+      #status.error {
+        background: rgba(245, 87, 108, 0.2);
+      }
+
+      #status.success {
+        background: rgba(52, 211, 153, 0.2);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+
+    <button class="toggle-btn" onclick="togglePanel()">☰ Controls</button>
+
+    <div id="controlPanel">
+      <div class="panel-header">
+        <span>🌍 Data Viewer Controls</span>
+      </div>
+
+      <!-- Data Loading Section -->
+      <div class="panel-section">
+        <div class="section-title">Load Data</div>
+        <label class="file-label" for="fileInput">
+          📁 Choose File (GeoJSON, KML, CZML, KMZ)
+        </label>
+        <input
+          type="file"
+          id="fileInput"
+          accept=".json,.geojson,.kml,.czml,.kmz"
+          onchange="loadDataFile(event)"
+        />
+
+        <button class="button button-secondary" onclick="loadSampleData()">
+          ⭐ Load Sample Data
+        </button>
+      </div>
+
+      <!-- Layers Section -->
+      <div class="panel-section">
+        <div class="section-title">Layers</div>
+        <div id="layersList">
+          <div
+            style="
+              color: #a0a0a0;
+              font-size: 12px;
+              text-align: center;
+              padding: 10px;
+            "
+          >
+            No layers loaded
+          </div>
+        </div>
+      </div>
+
+      <!-- Camera Controls -->
+      <div class="panel-section">
+        <div class="section-title">Camera</div>
+        <button class="button button-secondary" onclick="flyToHome()">
+          🏠 Home View
+        </button>
+        <button class="button button-secondary" onclick="flyToCurrentData()">
+          📍 Fit to Data
+        </button>
+
+        <div class="checkbox-container">
+          <input
+            type="checkbox"
+            id="terrainToggle"
+            onchange="toggleTerrain(this.checked)"
+          />
+          <label for="terrainToggle">Enable Terrain</label>
+        </div>
+      </div>
+
+      <!-- Visualization Options -->
+      <div class="panel-section">
+        <div class="section-title">Visualization</div>
+
+        <label
+          for="sceneMode"
+          style="font-size: 12px; display: block; margin-bottom: 5px"
+          >Scene Mode:</label
+        >
+        <select id="sceneMode" onchange="changeSceneMode(this.value)">
+          <option value="3D">3D Globe</option>
+          <option value="2D">2D Map</option>
+          <option value="COLUMBUS">Columbus View</option>
+        </select>
+
+        <div class="checkbox-container">
+          <input
+            type="checkbox"
+            id="atmosphereToggle"
+            checked
+            onchange="toggleAtmosphere(this.checked)"
+          />
+          <label for="atmosphereToggle">Show Atmosphere</label>
+        </div>
+
+        <div class="checkbox-container">
+          <input
+            type="checkbox"
+            id="lightingToggle"
+            checked
+            onchange="toggleLighting(this.checked)"
+          />
+          <label for="lightingToggle">Enable Lighting</label>
+        </div>
+      </div>
+
+      <!-- Tools -->
+      <div class="panel-section">
+        <div class="section-title">Tools</div>
+        <button class="button button-secondary" onclick="startMeasurement()">
+          📏 Measure Distance
+        </button>
+        <button class="button button-danger" onclick="clearAllData()">
+          🗑️ Clear All
+        </button>
+      </div>
+
+      <!-- Status -->
+      <div class="panel-section">
+        <div id="status"></div>
+      </div>
+    </div>
+
+    <div class="info-box" id="infoBox">
+      <div><strong>Custom Cesium Data Viewer</strong></div>
+      <div style="margin-top: 5px; font-size: 11px; color: #a0a0a0">
+        Click on features to view information
+      </div>
+    </div>
+
+    <!-- Cesium JS -->
+    <script src="../../Build/Cesium/Cesium.js"></script>
+
+    <!-- Application JS -->
+    <script src="app.js"></script>
+  </body>
+</html>
