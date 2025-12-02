@@ -1,0 +1,154 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Golden Gate Bridge",
+        "description": "Iconic suspension bridge in San Francisco",
+        "year_built": 1937,
+        "length_meters": 2737,
+        "type": "landmark"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-122.4783, 37.8199]
+      }
+    },
+    {
+      type": "Feature",
+      "properties": {
+        "name": "Statue of Liberty",
+        "description": "Symbol of freedom and democracy",
+        "year_built": 1886,
+        "height_meters": 93,
+        "type": "monument"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.0445, 40.6892]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Grand Canyon",
+        "description": "Natural wonder carved by the Colorado River",
+        "depth_meters": 1800,
+        "type": "natural"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-112.1401, 36.0544]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Mount Rushmore",
+        "description": "Carved faces of four US presidents",
+        "year_completed": 1941,
+        "type": "monument"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-103.4590, 43.8791]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Yellowstone National Park",
+        "description": "First national park in the world",
+        "year_established": 1872,
+        "area_sq_km": 8983,
+        "type": "park"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-110.5885, 44.4280]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Route 66",
+        "description": "Historic highway from Chicago to Los Angeles",
+        "year_commissioned": 1926,
+        "length_miles": 2448,
+        "type": "route"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-87.6298, 41.8781],
+          [-90.1994, 38.6270],
+          [-94.5786, 39.0997],
+          [-97.5164, 35.4676],
+          [-101.8313, 35.2220],
+          [-106.6504, 35.0844],
+          [-112.0740, 33.4484],
+          [-118.2437, 34.0522]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "California",
+        "description": "Approximate boundary of California",
+        "population": 39538223,
+        "area_sq_miles": 163696,
+        "type": "state"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-124.4096, 42.0095],
+          [-120.0060, 42.0022],
+          [-114.6374, 35.0022],
+          [-114.1312, 34.2622],
+          [-114.4337, 33.0400],
+          [-114.7219, 32.7186],
+          [-117.1258, 32.5343],
+          [-117.2959, 33.0461],
+          [-118.4085, 33.7403],
+          [-118.5205, 34.0276],
+          [-119.8212, 34.4187],
+          [-120.6380, 34.5697],
+          [-120.6650, 35.1083],
+          [-121.8953, 36.3154],
+          [-121.9400, 36.9700],
+          [-122.3790, 37.3730],
+          [-122.5139, 37.7977],
+          [-122.9517, 38.1133],
+          [-123.7272, 38.9516],
+          [-123.8652, 39.7661],
+          [-124.3985, 40.3120],
+          [-124.2108, 41.9983],
+          [-124.4096, 42.0095]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Silicon Valley Tech Corridor",
+        "description": "Major tech companies area",
+        "companies": "Apple, Google, Facebook, Tesla",
+        "type": "region"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-122.0856, 37.4224],
+          [-121.9906, 37.3894],
+          [-121.9618, 37.3541],
+          [-122.0308, 37.3318],
+          [-122.0856, 37.3688],
+          [-122.0856, 37.4224]
+        ]]
+      }
+    }
+  ]
+}
