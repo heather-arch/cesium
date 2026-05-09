@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chore Tracker</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2230;
+    --panel-2: #222d3d;
+    --text: #e6edf3;
+    --muted: #8b98a8;
+    --accent: #5eead4;
+    --accent-2: #38bdf8;
+    --good: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --border: #2d3a4f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: linear-gradient(180deg, #0a0e14 0%, #0f1419 100%);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 80px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.5px; }
+  .tagline { color: var(--muted); font-size: 14px; }
+
+  .pep {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d4a3e 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 500;
+    font-size: 15px;
+  }
+
+  .progress {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px 16px;
+    align-items: center;
+  }
+  .bar { grid-column: 1 / -1; height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+  .bar > span {
+    display: block; height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+  .stat { font-size: 13px; color: var(--muted); }
+  .stat b { color: var(--text); font-weight: 600; }
+
+  details.cat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  details.cat[open] { background: var(--panel); }
+  summary {
+    cursor: pointer;
+    padding: 14px 18px;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    font-weight: 600;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after {
+    content: "▸";
+    color: var(--muted);
+    transition: transform 0.2s;
+  }
+  details[open] summary::after { transform: rotate(90deg); }
+  .cat-meta { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+
+  .tasks { padding: 4px 8px 12px; }
+  .task {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 10px;
+    transition: background 0.15s;
+  }
+  .task:hover { background: var(--panel-2); }
+  .task.done .label { text-decoration: line-through; color: var(--muted); }
+  .task.running { background: rgba(94, 234, 212, 0.08); }
+
+  .check {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .check:hover { border-color: var(--accent); }
+  .task.done .check {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .task.done .check::after {
+    content: "✓";
+    color: #0a1014;
+    font-weight: 800;
+    font-size: 14px;
+  }
+
+  .label { font-size: 15px; line-height: 1.3; }
+  .label small { color: var(--muted); display: block; font-size: 12px; margin-top: 2px; }
+
+  .est {
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--panel-2);
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .task.over .est { color: var(--warn); background: rgba(251, 191, 36, 0.12); }
+  .task.under-done .est { color: var(--good); background: rgba(74, 222, 128, 0.12); }
+
+  .timer-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .timer-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .task.running .timer-btn {
+    background: var(--accent);
+    color: #0a1014;
+    border-color: var(--accent);
+  }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #0a1014; border-color: var(--accent); font-weight: 600; }
+  .btn.primary:hover { background: var(--accent-2); border-color: var(--accent-2); color: #0a1014; }
+
+  .add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 0 12px 8px;
+  }
+  .add-row input {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .add-row input[type=text] { flex: 1; }
+  .add-row input[type=number] { width: 70px; text-align: right; }
+  .add-row input:focus { outline: none; border-color: var(--accent); }
+
+  .footnote {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 24px;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 480px) {
+    .task { grid-template-columns: auto 1fr auto; }
+    .task .timer-btn { grid-column: 3; grid-row: 1; }
+    .task .est { grid-column: 2 / 4; grid-row: 2; justify-self: start; margin-top: 2px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Chore Tracker</h1>
+    <div class="tagline">Real timings. Visible wins. One task at a time.</div>
+  </header>
+
+  <div class="pep" id="pep">Pick the smallest task. Start a timer. Go.</div>
+
+  <div class="progress">
+    <div class="stat"><b id="doneCount">0</b> / <span id="totalCount">0</span> done</div>
+    <div class="stat"><b id="timeSpent">0m</b> spent · <b id="timeLeft">0m</b> left</div>
+    <div class="bar"><span id="barFill"></span></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn primary" id="quickPick">Pick me a task</button>
+    <button class="btn" id="resetDay">Reset day</button>
+    <button class="btn" id="clearTimes">Clear timers only</button>
+  </div>
+
+  <div id="categories"></div>
+
+  <div class="footnote">
+    Rule: double your gut estimate.<br>
+    Saved locally in your browser.
+  </div>
+</div>
+
+<script>
+const DEFAULT_DATA = [
+  {
+    name: "Quick wins",
+    note: "Knock these out first for momentum",
+    tasks: [
+      { label: "Make the bed", est: 2 },
+      { label: "Take out trash / recycling", est: 5 },
+      { label: "Wipe kitchen counters", est: 5 },
+      { label: "Empty / load dishwasher", est: 8 },
+      { label: "Inbox triage (just sort)", est: 10 },
+    ],
+  },
+  {
+    name: "Self-care",
+    note: "You, but maintained",
+    tasks: [
+      { label: "Shower", sub: "undress, wash, dry, dress — be honest", est: 12 },
+      { label: "Skincare / teeth / grooming", est: 8 },
+      { label: "Workout", sub: "5 warm-up + 30 work + 10 stretch", est: 45 },
+      { label: "Stretch / mobility", est: 10 },
+    ],
+  },
+  {
+    name: "Kitchen",
+    note: "Start the bake first — it runs in the background",
+    tasks: [
+      { label: "Plan meal + grocery check", est: 10 },
+      { label: "Cook a proper meal", sub: "15 prep + 25 cook + 5 plate", est: 45 },
+      { label: "Bake", sub: "20 mix + 30–45 bake + 20 cool", est: 90 },
+      { label: "Wash up after cooking", est: 15 },
+    ],
+  },
+  {
+    name: "Laundry & clothes",
+    note: "Iron while a podcast plays",
+    tasks: [
+      { label: "Start a load of laundry", sub: "5 min hands-on, 60 min cycle", est: 5 },
+      { label: "Move to dryer / hang", est: 5 },
+      { label: "Fold + put away", est: 15 },
+      { label: "Iron (4–5 items)", sub: "setup 3 + 4 min/shirt + cooldown", est: 20 },
+    ],
+  },
+  {
+    name: "Home reset",
+    note: "Pick one or two — not all in one day",
+    tasks: [
+      { label: "Tidy / declutter one room", est: 15 },
+      { label: "Vacuum main areas", est: 20 },
+      { label: "Mop kitchen + bathroom", est: 20 },
+      { label: "Clean bathroom", sub: "sink, toilet, shower", est: 25 },
+      { label: "Change bedsheets", est: 10 },
+      { label: "Water plants", est: 5 },
+    ],
+  },
+  {
+    name: "Admin",
+    note: "Boring but it compounds",
+    tasks: [
+      { label: "Pay any due bills", est: 10 },
+      { label: "Reply to 3 messages", est: 15 },
+      { label: "Plan tomorrow (3 priorities)", est: 5 },
+    ],
+  },
+];
+
+const PEPS = [
+  "You don't need motivation. You need the next 2-minute task.",
+  "Done > perfect. Tick one box.",
+  "The hardest part is starting. So start the easiest one.",
+  "Future-you will thank present-you. Begin.",
+  "Stack five tiny wins before noon. That's the whole game.",
+  "A 70%-clean kitchen tonight beats a spotless one never.",
+  "Start the longest passive task first. Laundry. Bake. Oven.",
+  "One chore at a time. Multitasking inflates timings.",
+  "Pick the chore you're avoiding most. 5 minutes only. Then reassess.",
+];
+
+const STORE_KEY = "choreTracker.v1";
+
+let state = load();
+
+function load() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    if (saved && saved.cats && saved.day === today()) return saved;
+  } catch (e) {}
+  return fresh();
+}
+function fresh() {
+  return {
+    day: today(),
+    cats: DEFAULT_DATA.map(c => ({
+      ...c,
+      tasks: c.tasks.map(t => ({ ...t, done: false, spent: 0, runningSince: null })),
+    })),
+  };
+}
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+
+function fmt(min) {
+  if (min < 1) return "<1m";
+  if (min < 60) return Math.round(min) + "m";
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+function liveSpent(t) {
+  const base = t.spent || 0;
+  if (t.runningSince) return base + (Date.now() - t.runningSince) / 60000;
+  return base;
+}
+
+function render() {
+  const root = document.getElementById("categories");
+  root.innerHTML = "";
+  let totalDone = 0, total = 0, totalSpent = 0, totalLeft = 0;
+
+  state.cats.forEach((cat, ci) => {
+    const catDone = cat.tasks.filter(t => t.done).length;
+    const catEst = cat.tasks.reduce((s, t) => s + t.est, 0);
+    total += cat.tasks.length;
+    totalDone += catDone;
+    cat.tasks.forEach(t => {
+      totalSpent += liveSpent(t);
+      if (!t.done) totalLeft += t.est;
+    });
+
+    const det = document.createElement("details");
+    det.className = "cat";
+    if (catDone < cat.tasks.length) det.open = true;
+    det.innerHTML = `
+      <summary>
+        <span>${cat.name} <span class="cat-meta">${catDone}/${cat.tasks.length} · ${fmt(catEst)}</span></span>
+      </summary>
+      <div class="tasks"></div>
+      <div class="add-row">
+        <input type="text" placeholder="Add a task…" data-add-label>
+        <input type="number" placeholder="min" min="1" max="999" data-add-est>
+        <button class="btn" data-add-btn>Add</button>
+      </div>
+    `;
+    const tasksEl = det.querySelector(".tasks");
+
+    cat.tasks.forEach((t, ti) => {
+      const spent = liveSpent(t);
+      const over = !t.done && spent > t.est;
+      const row = document.createElement("div");
+      row.className = "task" + (t.done ? " done" : "") + (t.runningSince ? " running" : "") + (over ? " over" : "") + (t.done && t.spent && t.spent <= t.est ? " under-done" : "");
+      row.innerHTML = `
+        <div class="check" data-check></div>
+        <div class="label">${escapeHtml(t.label)}${t.sub ? `<small>${escapeHtml(t.sub)}</small>` : ""}</div>
+        <div class="est">${spent > 0 ? `${fmt(spent)} / ` : ""}${fmt(t.est)}</div>
+        <button class="timer-btn" data-timer title="${t.runningSince ? "Pause" : "Start timer"}">${t.runningSince ? "⏸" : "▶"}</button>
+      `;
+      row.querySelector("[data-check]").onclick = () => toggleDone(ci, ti);
+      row.querySelector("[data-timer]").onclick = () => toggleTimer(ci, ti);
+      tasksEl.appendChild(row);
+    });
+
+    const addInput = det.querySelector("[data-add-label]");
+    const addEst = det.querySelector("[data-add-est]");
+    const addBtn = det.querySelector("[data-add-btn]");
+    const doAdd = () => {
+      const label = addInput.value.trim();
+      const est = parseInt(addEst.value, 10);
+      if (!label || !est || est < 1) return;
+      cat.tasks.push({ label, est, done: false, spent: 0, runningSince: null });
+      save(); render();
+    };
+    addBtn.onclick = doAdd;
+    addInput.onkeydown = e => { if (e.key === "Enter") doAdd(); };
+    addEst.onkeydown = e => { if (e.key === "Enter") doAdd(); };
+
+    root.appendChild(det);
+  });
+
+  document.getElementById("doneCount").textContent = totalDone;
+  document.getElementById("totalCount").textContent = total;
+  document.getElementById("timeSpent").textContent = fmt(totalSpent);
+  document.getElementById("timeLeft").textContent = fmt(totalLeft);
+  document.getElementById("barFill").style.width = total ? (totalDone / total * 100) + "%" : "0%";
+
+  if (totalDone === total && total > 0) {
+    document.getElementById("pep").textContent = "Everything ticked. Genuinely well done.";
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+function toggleDone(ci, ti) {
+  const t = state.cats[ci].tasks[ti];
+  if (t.runningSince) {
+    t.spent = liveSpent(t);
+    t.runningSince = null;
+  }
+  t.done = !t.done;
+  save();
+  render();
+  if (t.done) celebrate();
+}
+
+function toggleTimer(ci, ti) {
+  const t = state.cats[ci].tasks[ti];
+  if (t.runningSince) {
+    t.spent = liveSpent(t);
+    t.runningSince = null;
+  } else {
+    state.cats.forEach(c => c.tasks.forEach(other => {
+      if (other.runningSince) {
+        other.spent = liveSpent(other);
+        other.runningSince = null;
+      }
+    }));
+    t.runningSince = Date.now();
+  }
+  save();
+  render();
+}
+
+function celebrate() {
+  const pep = document.getElementById("pep");
+  const msgs = [
+    "Win locked in. Next.",
+    "That's one less thing. Keep rolling.",
+    "Momentum > motivation. You're proving it.",
+    "Tick. Felt good, didn't it?",
+  ];
+  pep.textContent = msgs[Math.floor(Math.random() * msgs.length)];
+}
+
+document.getElementById("quickPick").onclick = () => {
+  const open = [];
+  state.cats.forEach((c, ci) => c.tasks.forEach((t, ti) => { if (!t.done) open.push({ ci, ti, t }); }));
+  if (!open.length) return;
+  open.sort((a, b) => a.t.est - b.t.est);
+  const pick = open[Math.floor(Math.random() * Math.min(3, open.length))];
+  const pep = document.getElementById("pep");
+  pep.textContent = `Do this next: ${pick.t.label} · ${fmt(pick.t.est)}. Hit ▶ and go.`;
+};
+
+document.getElementById("resetDay").onclick = () => {
+  if (!confirm("Reset all checks and timers?")) return;
+  state = fresh();
+  save(); render();
+  document.getElementById("pep").textContent = PEPS[Math.floor(Math.random() * PEPS.length)];
+};
+
+document.getElementById("clearTimes").onclick = () => {
+  state.cats.forEach(c => c.tasks.forEach(t => { t.spent = 0; t.runningSince = null; }));
+  save(); render();
+};
+
+document.getElementById("pep").textContent = PEPS[Math.floor(Math.random() * PEPS.length)];
+render();
+setInterval(() => {
+  const anyRunning = state.cats.some(c => c.tasks.some(t => t.runningSince));
+  if (anyRunning) render();
+}, 1000);
+</script>
+</body>
+</html>
